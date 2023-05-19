@@ -1,3 +1,4 @@
+- Run `npm install`
 - Copy `.env.example` and name it as `.env`
 - SET BOT_API_KEY in `.env`
 - Run `npm run start`
