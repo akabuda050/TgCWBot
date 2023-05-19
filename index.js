@@ -4,7 +4,7 @@ import { message } from 'telegraf/filters';
 import { v4 } from 'uuid'
 
 dotenv.config();
-const bot = new Telegraf(process.env.API_KEY);
+const bot = new Telegraf(process.env.BOT_API_KEY);
 
 bot.context.db = {
   step: 'login',
