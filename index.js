@@ -7,7 +7,7 @@ dotenv.config();
 const bot = new Telegraf(process.env.API_KEY);
 
 bot.context.db = {
-  step: '',
+  step: 'login',
   enter_password_message_id: null,
 }
 
@@ -88,7 +88,16 @@ bot.on('callback_query', async (ctx) => {
 
 bot.on(message('text'), async (ctx) => {
   console.log(ctx.db.step)
-  if (ctx.db.step === 'password') {
+  if (ctx.db.step === 'login') {
+    loginForm(ctx);
+
+    countdown(3, null, () => {
+      ctx.deleteMessage(ctx.message.message_id).catch((e) => {
+        console.log('Logged in error')
+      })
+    });
+  }
+  else if (ctx.db.step === 'password') {
     ctx.db.step = 'wallet';
 
     await ctx.deleteMessage(ctx.db.enter_password_message_id);
@@ -98,28 +107,16 @@ bot.on(message('text'), async (ctx) => {
     const msg = await ctx.reply(`Logged in ${ctx.message.text}`);
 
     countdown(3, null, () => {
-      ctx.deleteMessage(msg.message_id).catch((e) => {
+      ctx.deleteMessage(ctx.message.message_id).catch((e) => {
         console.log('Logged in error')
       })
     });
 
   } else if (ctx.db.step === 'wallet') {
     const msg = await ctx.reply(`TBD`);
-
-    countdown(3, null, () => {
-      ctx.deleteMessage(msg.message_id).catch((e) => {
-        console.log('After Logged in error')
-      })
-    });
   } else {
-    loginForm(ctx);
+    
   }
-
-  countdown(3, null, () => {
-    ctx.deleteMessage(ctx.message.message_id).catch((e) => {
-      console.log('User message deletion error')
-    })
-  });
 });
 
 bot.inlineQuery(['help'], async (ctx) => {
@@ -140,9 +137,6 @@ bot.inlineQuery(['help'], async (ctx) => {
       ]
     }
   }];
-  console.log(ctx.inlineQuery);
-  // Explicit usage
-  //await ctx.telegram.answerInlineQuery(ctx.inlineQuery.id, result);
 
   // Using context shortcut
   await ctx.answerInlineQuery(result, {
