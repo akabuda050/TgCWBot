@@ -123,7 +123,7 @@ bot.on(message('text'), async (ctx) => {
 });
 
 bot.inlineQuery(['help'], async (ctx) => {
-  const message = `Weclome to Telegram Wallet Bot!\nYou can use inline mode as follow\n@TgCWBot start`;
+  const message = `Weclome to Telegram Wallet Bot!`;
   const result = [{
     type: "article",
     id: v4(),
