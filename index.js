@@ -54,19 +54,21 @@ bot.start(async (ctx) => {
 });
 
 bot.command('stop', async (ctx) => {
+  ctx.db.private_key = null;
   ctx.db.step = 'login';
+
   ctx.deleteMessage();
   loginForm(ctx);
 });
 
 bot.on('callback_query', async (ctx) => {
   if (ctx.callbackQuery.data === 'login') {
-    await prompt(ctx, 'Enter your secret code 🗝️', 'enter_secret_code_message_id');
-    ctx.db.step = 'secret_key';
+    await prompt(ctx, 'Enter your secret code (10s) 🗝️', 'enter_secret_code_message_id');
+    ctx.db.step = 'secret_code';
   } else if (ctx.callbackQuery.data === 'register') {
-    await prompt(ctx, 'Enter your password key 🗝️', 'enter_password_key_message_id');
+    await prompt(ctx, 'Enter your password (10s) 🗝️', 'enter_register_password_message_id');
 
-    ctx.db.step = 'password_key';
+    ctx.db.step = 'register';
   }
 })
 
@@ -87,12 +89,6 @@ const prompt = async (ctx, prompt, db_message_id, seconds = 10) => {
 
       return;
     }
-
-    ctx.editMessageText(`${prompt} (${seconds}s)`, { message_id: ctx.db[db_message_id] }).then((message) => {
-      ctx.db[db_message_id] = message.message_id;
-    }).catch(() => {
-      console.log(`Step Error: ${ctx.db[db_message_id]}`)
-    });
   }, () => {
     ctx.deleteMessage(ctx.db[db_message_id]).then(() => {
       ctx.db[db_message_id] = null
@@ -106,14 +102,23 @@ const prompt = async (ctx, prompt, db_message_id, seconds = 10) => {
 bot.on(message('text'), async (ctx) => {
   console.log(ctx.db.step)
   if (ctx.db.step === 'login') {
+    ctx.deleteMessage(ctx.message.message_id).catch((e) => {
+      console.log('Logged in error')
+    });
     loginForm(ctx);
 
-    countdown(3, null, () => {
-      ctx.deleteMessage(ctx.message.message_id).catch((e) => {
+  } else if (ctx.db.step === 'register') {
+    if (ctx.db.enter_register_password_message_id) {
+      ctx.deleteMessage(ctx.db.enter_register_password_message_id).catch((e) => {
         console.log('Logged in error')
       })
-    });
-  } else if (ctx.db.step === 'password_key') {
+      ctx.db.enter_register_password_message_id = null;
+    }
+
+    ctx.deleteMessage(ctx.message.message_id).catch((e) => {
+      console.log('Logged in error')
+    })
+
     const wallet = crypto.randomBytes(32).toString('hex');
 
     const password = `${ctx.message.text}`;
@@ -123,21 +128,57 @@ bot.on(message('text'), async (ctx) => {
     const key = `${encryptedPrivateKey.encryptedData}_${encryptedPrivateKey.nonce}_${encryptedPrivateKey.authTag}`;
 
     // Using context shortcut
-    await ctx.reply(`Copy key 📑`);
-    await ctx.reply(`${key}`);
 
+    await prompt(ctx, 'Copy key 📑', 'secret_key_copy_message_id');
+    await prompt(ctx, `${key}`, 'secret_key_message_id');
+
+    await ctx.reply(`Logged in.`);
+    await ctx.reply(`Balance: 0`);
+
+    ctx.db.private_key = key;
     ctx.db.step = 'wallet';
-  }
+  } else if (ctx.db.step === 'secret_code') {
+    if (ctx.db.enter_secret_code_message_id) {
+      ctx.deleteMessage(ctx.db.enter_secret_code_message_id).catch((e) => {
+        console.log('Logged in error')
+      })
 
-  else if (ctx.db.step === 'private_key') {
-    if (ctx.db.enter_private_key_message_id) {
-      await ctx.deleteMessage(ctx.db.enter_private_key_message_id);
-      ctx.db.enter_private_key_message_id = null;
+      ctx.db.enter_secret_code_message_id = null;
     }
 
-    // decrypt this wallet 7ba8094866a9600585c810afbad724e6d52f2aa7c7bebed1b146c756f8e3a1c9
+    ctx.deleteMessage(ctx.message.message_id).catch((e) => {
+      console.log('Logged in error')
+    })
 
-    ctx.db.step = 'wallet';
+    ctx.db.private_key = `${ctx.message.text}`;
+    ctx.db.step = 'secret_key_confirm';
+
+    await prompt(ctx, 'Enter your password (10s) 🗝️', 'secret_key_confirm_message_id');
+  } else if (ctx.db.step === 'secret_key_confirm') {
+    if (ctx.db.secret_key_confirm_message_id) {
+      ctx.deleteMessage(ctx.db.secret_key_confirm_message_id).catch((e) => {
+        console.log('Logged in error')
+      })
+
+      ctx.db.secret_key_confirm_message_id = null;
+    }
+    ctx.deleteMessage(ctx.message.message_id).catch((e) => {
+      console.log('Logged in error')
+    })
+    const params = ctx.db.private_key.split('_');
+    const wallet = decryptData(params[0], params[1], params[2], ctx.message.text);
+    if (wallet === 'ba68d72d8d3eebbc3e6dd69b4d5dc37a93c8974d8c0ff0ca4a9f61179e675485') {
+      await ctx.reply(`Logged in.`);
+      await ctx.reply(`Balance: 0`);
+      ctx.db.step = 'wallet';
+
+    } else {
+      await ctx.reply(`Wrong`);
+
+      ctx.db.private_key = null;
+      ctx.db.step = 'login';
+    }
+
   } else {
     ctx.deleteMessage(ctx.message.message_id).catch((e) => {
       console.log('Logged in error')
