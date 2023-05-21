@@ -12,8 +12,8 @@ const loginForm = async (ctx) => {
     reply_markup: {
       inline_keyboard: [
         [
-          { text: 'Login', web_app: {url: 'https://akabuda050.github.io/solana-wallet-tg?action=login'} },
-          { text: 'Register',  web_app: {url: 'https://akabuda050.github.io/solana-wallet-tg?action=register'} },
+          { text: 'Login', web_app: { url: 'https://akabuda050.github.io/solana-wallet-tg?action=login' } },
+          { text: 'Register', web_app: { url: 'https://akabuda050.github.io/solana-wallet-tg?action=register' } },
         ],
       ]
     }
@@ -38,8 +38,16 @@ bot.on('callback_query', async (ctx) => {
 })
 
 bot.on(message('text'), async (ctx) => {
-  const message = await ctx.sendMessage('TBD');
-
+  if (ctx?.webAppData?.data) {
+    try {
+      const webAppData = JSON.parse(ctx?.webAppData?.data);
+      ctx.reply(`Action: ${webAppData?.action || ''}`)
+    } catch (e) {
+      console.error(`WEB APP DATA: ${e}`);
+    }
+  } else {
+    const message = await ctx.sendMessage('TBD');
+  }
 });
 
 bot.inlineQuery(['help'], async (ctx) => {
