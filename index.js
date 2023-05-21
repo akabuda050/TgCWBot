@@ -7,183 +7,39 @@ import crypto from 'crypto';
 dotenv.config();
 const bot = new Telegraf(process.env.BOT_API_KEY);
 
-bot.context.db = {
-  step: 'login',
-  password: null,
-  enter_password_message_id: null,
-  enter_private_key_message_id: null,
-}
-
-bot.command('deleteAll', async (ctx) => {
-  let res = await ctx.reply('deleting');
-  console.log(res);
-  for (let i = res.message_id; i >= 0; i--) {
-    console.log(`chat_id: ${ctx.chat.id}, message_id: ${i}`);
-    try {
-      let res = await ctx.telegram.deleteMessage(ctx.chat.id, i);
-      console.log(res);
-    } catch (e) {
-      console.error('Message not found');
-    }
-  }
-});
-
 const loginForm = async (ctx) => {
   const msg = await ctx.sendMessage('Please login', {
     reply_markup: {
       inline_keyboard: [
         [
-          { text: 'Login', callback_data: 'login' },
-          { text: 'Register', callback_data: 'register' },
+          { text: 'Login', web_app: {url: 'https://akabuda050.github.io/solana-wallet-tg?action=login'} },
+          { text: 'Register',  web_app: {url: 'https://akabuda050.github.io/solana-wallet-tg?action=register'} },
         ],
       ]
     }
   });
-
-  countdown(3, null, () => {
-    ctx.deleteMessage(msg.message_id).catch((e) => {
-      console.log('Logged in error')
-    })
-  });
 }
 
-bot.start(async (ctx) => {
-  ctx.db.step = 'login';
-  ctx.deleteMessage();
+bot.command('start', async (ctx) => {
+  const message = await ctx.sendMessage('Welcome! 🙌');
+
   loginForm(ctx);
 });
 
 bot.command('stop', async (ctx) => {
-  ctx.db.private_key = null;
-  ctx.db.step = 'login';
+  const message = await ctx.sendMessage('See you next time 🙌');
 
-  ctx.deleteMessage();
-  loginForm(ctx);
 });
 
 bot.on('callback_query', async (ctx) => {
   if (ctx.callbackQuery.data === 'login') {
-    await prompt(ctx, 'Enter your secret code (10s) 🗝️', 'enter_secret_code_message_id');
-    ctx.db.step = 'secret_code';
   } else if (ctx.callbackQuery.data === 'register') {
-    await prompt(ctx, 'Enter your password (10s) 🗝️', 'enter_register_password_message_id');
-
-    ctx.db.step = 'register';
   }
 })
 
-
-const prompt = async (ctx, prompt, db_message_id, seconds = 10) => {
-  const message = await ctx.sendMessage(prompt);
-
-  if (!seconds) {
-    return;
-  }
-
-  ctx.db[db_message_id] = message.message_id;
-
-  countdown(10, (seconds, interval) => {
-    console.log(`Step: ${ctx.db[db_message_id]}`)
-    if (!ctx.db[db_message_id]) {
-      clearInterval(interval);
-
-      return;
-    }
-  }, () => {
-    ctx.deleteMessage(ctx.db[db_message_id]).then(() => {
-      ctx.db[db_message_id] = null
-    })
-      .catch((e) => {
-        console.log('deleteMessage error')
-      })
-  })
-}
-
 bot.on(message('text'), async (ctx) => {
-  console.log(ctx.db.step)
-  if (ctx.db.step === 'login') {
-    ctx.deleteMessage(ctx.message.message_id).catch((e) => {
-      console.log('Logged in error')
-    });
-    loginForm(ctx);
+  const message = await ctx.sendMessage('TBD');
 
-  } else if (ctx.db.step === 'register') {
-    if (ctx.db.enter_register_password_message_id) {
-      ctx.deleteMessage(ctx.db.enter_register_password_message_id).catch((e) => {
-        console.log('Logged in error')
-      })
-      ctx.db.enter_register_password_message_id = null;
-    }
-
-    ctx.deleteMessage(ctx.message.message_id).catch((e) => {
-      console.log('Logged in error')
-    })
-
-    const wallet = crypto.randomBytes(32).toString('hex');
-
-    const password = `${ctx.message.text}`;
-    const encryptedPrivateKey = encryptData(wallet, password);
-
-    console.log({ password, wallet, encryptedPrivateKey });
-    const key = `${encryptedPrivateKey.encryptedData}_${encryptedPrivateKey.nonce}_${encryptedPrivateKey.authTag}`;
-
-    // Using context shortcut
-
-    await prompt(ctx, 'Copy key 📑', 'secret_key_copy_message_id');
-    await prompt(ctx, `${key}`, 'secret_key_message_id');
-
-    await ctx.reply(`Logged in.`);
-    await ctx.reply(`Balance: 0`);
-
-    ctx.db.private_key = key;
-    ctx.db.step = 'wallet';
-  } else if (ctx.db.step === 'secret_code') {
-    if (ctx.db.enter_secret_code_message_id) {
-      ctx.deleteMessage(ctx.db.enter_secret_code_message_id).catch((e) => {
-        console.log('Logged in error')
-      })
-
-      ctx.db.enter_secret_code_message_id = null;
-    }
-
-    ctx.deleteMessage(ctx.message.message_id).catch((e) => {
-      console.log('Logged in error')
-    })
-
-    ctx.db.private_key = `${ctx.message.text}`;
-    ctx.db.step = 'secret_key_confirm';
-
-    await prompt(ctx, 'Enter your password (10s) 🗝️', 'secret_key_confirm_message_id');
-  } else if (ctx.db.step === 'secret_key_confirm') {
-    if (ctx.db.secret_key_confirm_message_id) {
-      ctx.deleteMessage(ctx.db.secret_key_confirm_message_id).catch((e) => {
-        console.log('Logged in error')
-      })
-
-      ctx.db.secret_key_confirm_message_id = null;
-    }
-    ctx.deleteMessage(ctx.message.message_id).catch((e) => {
-      console.log('Logged in error')
-    })
-    const params = ctx.db.private_key.split('_');
-    const wallet = decryptData(params[0], params[1], params[2], ctx.message.text);
-    if (wallet === 'ba68d72d8d3eebbc3e6dd69b4d5dc37a93c8974d8c0ff0ca4a9f61179e675485') {
-      await ctx.reply(`Logged in.`);
-      await ctx.reply(`Balance: 0`);
-      ctx.db.step = 'wallet';
-
-    } else {
-      await ctx.reply(`Wrong`);
-
-      ctx.db.private_key = null;
-      ctx.db.step = 'login';
-    }
-
-  } else {
-    ctx.deleteMessage(ctx.message.message_id).catch((e) => {
-      console.log('Logged in error')
-    })
-  }
 });
 
 bot.inlineQuery(['help'], async (ctx) => {
@@ -237,7 +93,7 @@ function encryptData(data, password) {
   };
 }
 
-function decryptData(encryptedData, nonce, authTag, password) {
+async function decryptData(encryptedData, nonce, authTag, password) {
   const pass = String((password));
   const key = crypto.createHash('sha256').update(pass).digest();
 
