@@ -10,10 +10,11 @@ const bot = new Telegraf(process.env.BOT_API_KEY);
 const loginForm = async (ctx) => {
   const msg = await ctx.sendMessage('Please login', {
     reply_markup: {
-      inline_keyboard: [
+      resize_keyboard: true,
+      keyboard: [
         [
-          { text: 'Login', web_app: { url: 'https://akabuda050.github.io/solana-wallet-tg?action=login' } },
-          { text: 'Register', web_app: { url: 'https://akabuda050.github.io/solana-wallet-tg?action=register' } },
+          { text: 'Login', web_app: { url: 'https://31a9-86-49-227-130.ngrok-free.app?action=login' } },
+          { text: 'Register', web_app: { url: 'https://31a9-86-49-227-130.ngrok-free.app?action=register' } },
         ],
       ]
     }
@@ -31,19 +32,26 @@ bot.command('stop', async (ctx) => {
 
 });
 
-bot.on('callback_query', async (ctx) => {
-  if (ctx.callbackQuery.data === 'login') {
-  } else if (ctx.callbackQuery.data === 'register') {
+bot.on('web_app_data', async (ctx) => {
+  console.log(ctx.message)
+
+  if (ctx?.webAppData?.data) {
+    try {
+      const webAppData = ctx?.webAppData?.data.json();
+  ctx.reply(`Action: ${webAppData?.action || ''}`)
+    } catch (e) {
+    console.error(`WEB APP DATA: ${e}`);
+    }
   }
+
 })
 
 bot.on(message('text'), async (ctx) => {
   if (ctx?.webAppData?.data) {
     try {
-      const webAppData = JSON.parse(ctx?.webAppData?.data);
-      ctx.reply(`Action: ${webAppData?.action || ''}`)
-    } catch (e) {
-      console.error(`WEB APP DATA: ${e}`);
+
+  } catch (e) {
+    console.error(`WEB APP DATA: ${e}`);
     }
   } else {
     const message = await ctx.sendMessage('TBD');
@@ -54,18 +62,18 @@ bot.inlineQuery(['help'], async (ctx) => {
   const message = `Weclome to Telegram Wallet Bot!`;
   const result = [{
     type: "article",
-    id: v4(),
-    title: 'Help',
-    description: 'Information on how to use bot',
-    input_message_content: {
-      message_text: message,
+  id: v4(),
+  title: 'Help',
+  description: 'Information on how to use bot',
+  input_message_content: {
+    message_text: message,
     },
-    reply_markup: {
-      inline_keyboard: [
-        [
-          { text: 'Start', url: 'https://t.me/TgCWBot?start=airplane' },
-        ],
-      ]
+  reply_markup: {
+    inline_keyboard: [
+  [
+  {text: 'Start', url: 'https://t.me/TgCWBot?start=airplane' },
+  ],
+  ]
     }
   }];
 
@@ -75,19 +83,19 @@ bot.inlineQuery(['help'], async (ctx) => {
   });
 });
 
-bot.launch();
+  bot.launch();
 
 // Enable graceful stop
 process.once('SIGINT', () => bot.stop('SIGINT'));
 process.once('SIGTERM', () => bot.stop('SIGTERM'));
 
-function encryptData(data, password) {
+  function encryptData(data, password) {
   const pass = String(password);
 
   const key = crypto.createHash('sha256').update(pass).digest();
   const nonce = crypto.randomBytes(12);
 
-  const cipher = crypto.createCipheriv('aes-256-ccm', key, nonce, { authTagLength: 16 });
+  const cipher = crypto.createCipheriv('aes-256-ccm', key, nonce, {authTagLength: 16 });
   const encrypted = Buffer.concat([cipher.update(data, 'utf8'), cipher.final()]);
 
   // Get the authentication tag
@@ -96,16 +104,16 @@ function encryptData(data, password) {
   // Return the encrypted data, nonce, and authentication tag
   return {
     encryptedData: encrypted.toString('hex'),
-    nonce: nonce.toString('hex'),
-    authTag: authTag.toString('hex'),
+  nonce: nonce.toString('hex'),
+  authTag: authTag.toString('hex'),
   };
 }
 
-async function decryptData(encryptedData, nonce, authTag, password) {
+  async function decryptData(encryptedData, nonce, authTag, password) {
   const pass = String((password));
   const key = crypto.createHash('sha256').update(pass).digest();
 
-  const decipher = crypto.createDecipheriv('aes-256-ccm', key, Buffer.from(nonce, 'hex'), { authTagLength: 16 });
+  const decipher = crypto.createDecipheriv('aes-256-ccm', key, Buffer.from(nonce, 'hex'), {authTagLength: 16 });
 
   // Set the authentication tag
   decipher.setAuthTag(Buffer.from(authTag, 'hex'));
@@ -115,22 +123,22 @@ async function decryptData(encryptedData, nonce, authTag, password) {
   return decrypted.toString('utf8');
 }
 
-function countdown(seconds, stepCb, finishCb) {
-  let interval = setInterval(function () {
+  function countdown(seconds, stepCb, finishCb) {
+    let interval = setInterval(function () {
     if (seconds === 0) {
-      clearInterval(interval);
+    clearInterval(interval);
 
-      if (typeof finishCb === 'function') {
-        finishCb();
+  if (typeof finishCb === 'function') {
+    finishCb();
       }
 
-      return;
+  return;
     }
 
-    seconds--;
+  seconds--;
 
-    if (typeof stepCb === 'function') {
-      stepCb(seconds, interval);
+  if (typeof stepCb === 'function') {
+    stepCb(seconds, interval);
     }
   }, 1000);
 }
