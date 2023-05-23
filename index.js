@@ -47,9 +47,10 @@ async function getTransaction(connection, sig) {
 }
 
 const loginForm = async (ctx) => {
-  const msg = await ctx.sendMessage('Please click Wallet to connect', {
+  const msg = await ctx.sendMessage('Please click Connect to enable in-chat notifications or use Main menu just use wallet.', {
     reply_markup: {
       resize_keyboard: true,
+      is_persistent: false,
       keyboard: [
         [
           { text: 'Connect', web_app: { url: 'https://akabuda050.github.io/solana-wallet-tg/?action=enable_notifications' } },
@@ -69,8 +70,6 @@ bot.command('stop', async (ctx) => {
   const message = await ctx.sendMessage('See you next time 🙌');
 
 });
-
-
 
 bot.on('web_app_data', async (ctx) => {
   console.log(ctx.message)
@@ -97,9 +96,10 @@ bot.on('web_app_data', async (ctx) => {
             lastTransaction: lastTransaction[0]?.tsig
           }
 
-          ctx.reply(`Your Public Key: ${webAppData?.pubKey || ''}`, {
+          ctx.reply(`Notifications have been enabled for: ${webAppData?.pubKey || ''}`, {
             reply_markup: {
               resize_keyboard: true,
+              is_persistent: false,
               keyboard: [
                 [
                   { text: 'Disable in-chat notifications', web_app: { url: 'https://akabuda050.github.io/solana-wallet-tg/?action=disable_notifications' } },
@@ -114,6 +114,19 @@ bot.on('web_app_data', async (ctx) => {
           ctx.reply(`Notifications have been disabled for: ${webAppData?.pubKey || ''}`, {
             reply_markup: {
               resize_keyboard: true,
+              is_persistent: false,
+              keyboard: [
+                [
+                  { text: 'Enable in-chat notifications', web_app: { url: 'https://akabuda050.github.io/solana-wallet-tg/?action=enable_notifications' } },
+                ],
+              ]
+            }
+          })
+        } else {
+          ctx.reply(`It seems notifications have been disabled for: ${webAppData?.pubKey || ''}`, {
+            reply_markup: {
+              resize_keyboard: true,
+              is_persistent: false,
               keyboard: [
                 [
                   { text: 'Enable in-chat notifications', web_app: { url: 'https://akabuda050.github.io/solana-wallet-tg/?action=enable_notifications' } },
