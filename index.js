@@ -2,20 +2,23 @@ import dotenv from 'dotenv';
 import { Telegraf } from 'telegraf';
 import { message } from 'telegraf/filters';
 import { v4 } from 'uuid'
+import * as web3 from '@solana/web3.js';
 
 dotenv.config();
+
 const bot = new Telegraf(process.env.BOT_API_KEY);
+
+const solanaConnection = new web3.Connection('https://api.testnet.solana.com', 'confirmed');
 
 const loginForm = async (ctx) => {
   const msg = await ctx.sendMessage('Please click Wallet to connect', {
     reply_markup: {
       resize_keyboard: true,
-      //inline_keyboard: [
-      //  [
-      //    { text: 'Login', web_app: { url: 'https://1027-86-49-227-130.ngrok-free.app?action=login' } },
-      //    { text: 'Register', web_app: { url: 'https://1027-86-49-227-130.ngrok-free.app?action=register' } },
-      //  ],
-      //]
+      keyboard: [
+        [
+          { text: 'Enable in-chat notifications', web_app: { url: 'https://akabuda050.github.io/solana-wallet-tg/?action=enable_notifications' } },
+        ],
+      ]
     }
   });
 }
@@ -37,7 +40,14 @@ bot.on('web_app_data', async (ctx) => {
   if (ctx?.webAppData?.data) {
     try {
       const webAppData = ctx?.webAppData?.data.json();
-      ctx.reply(`Action: ${webAppData?.action || ''}`)
+      console.log(webAppData)
+
+      ctx.reply(`Your Public Key: ${webAppData?.pubKey || ''}`)
+
+      solanaConnection.onAccountChange(new web3.PublicKey(webAppData?.pubKey), () => {
+        ctx.reply(`Noticed changes in wallet. Check your wallet.`)
+      })
+
     } catch (e) {
       console.error(`WEB APP DATA: ${e}`);
     }
