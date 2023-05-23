@@ -8,7 +8,43 @@ dotenv.config();
 
 const bot = new Telegraf(process.env.BOT_API_KEY);
 
+bot.context.db = {
+  ClientSubscriptionId: null,
+}
+
+
 const solanaConnection = new web3.Connection('https://api.testnet.solana.com', 'confirmed');
+
+async function getHistory(connection, publicKey, options = { limit: 5, before: undefined }) {
+  const transactions = await connection.getConfirmedSignaturesForAddress2(publicKey, options);
+  const mappedTransactions = await Promise.all(transactions.map(async (t) => {
+    const trans = await getTransaction(connection, t.signature);
+    console.log(trans);
+    const account = trans?.transaction.message.getAccountKeys();
+
+    const itsMine = account?.get(0)?.toBase58() === publicKey.toBase58();
+
+    const preBalance = itsMine ? trans?.meta?.preBalances[0] : trans?.meta?.preBalances[1] || 0;
+    const postBalance = itsMine ? trans?.meta?.postBalances[0] : trans?.meta?.postBalances[1] || 0;
+
+    return {
+      tsig: t.signature,
+      balance: postBalance,
+      amount: itsMine ? preBalance - postBalance : postBalance - preBalance,
+      accounts: trans?.transaction.message.getAccountKeys().staticAccountKeys.map(a => {
+        return a.toBase58()
+      }),
+      itsMine,
+    };
+  }));
+  console.log(mappedTransactions)
+
+  return mappedTransactions;
+}
+
+async function getTransaction(connection, sig) {
+  return await connection.getTransaction(sig);
+}
 
 const loginForm = async (ctx) => {
   const msg = await ctx.sendMessage('Please click Wallet to connect', {
@@ -16,7 +52,7 @@ const loginForm = async (ctx) => {
       resize_keyboard: true,
       keyboard: [
         [
-          { text: 'Enable in-chat notifications', web_app: { url: 'https://akabuda050.github.io/solana-wallet-tg/?action=enable_notifications' } },
+          { text: 'Connect', web_app: { url: 'https://akabuda050.github.io/solana-wallet-tg/?action=enable_notifications' } },
         ],
       ]
     }
@@ -34,20 +70,59 @@ bot.command('stop', async (ctx) => {
 
 });
 
+
+
 bot.on('web_app_data', async (ctx) => {
   console.log(ctx.message)
 
   if (ctx?.webAppData?.data) {
     try {
       const webAppData = ctx?.webAppData?.data.json();
-      console.log(webAppData)
 
-      ctx.reply(`Your Public Key: ${webAppData?.pubKey || ''}`)
+      if (webAppData?.pubKey) {
 
-      solanaConnection.onAccountChange(new web3.PublicKey(webAppData?.pubKey), () => {
-        ctx.reply(`Noticed changes in wallet. Check your wallet.`)
-      })
+        if (webAppData?.action === 'enable') {
+          const csid = solanaConnection.onAccountChange(new web3.PublicKey(webAppData?.pubKey), async () => {
+            const lastTransaction = await getHistory(solanaConnection, new web3.PublicKey(webAppData?.pubKey), { limit: 1 })
+            if (lastTransaction[0]?.tsig && lastTransaction[0]?.tsig !== ctx.db.ClientSubscriptionId.lastTransaction) {
+              ctx.reply(`Wallet:\n${webAppData?.pubKey}.\n${lastTransaction[0]?.itsMine ? 'Sent:' : 'Received:'} ${(lastTransaction[0]?.amount * 0.000000001).toFixed(5)} SOL`)
+            }
+          })
 
+          const lastTransaction = await getHistory(solanaConnection, new web3.PublicKey(webAppData?.pubKey), { limit: 1 })
+
+          ctx.db.ClientSubscriptionId = {
+            csid,
+            pubKey: webAppData?.pubKey,
+            lastTransaction: lastTransaction[0]?.tsig
+          }
+
+          ctx.reply(`Your Public Key: ${webAppData?.pubKey || ''}`, {
+            reply_markup: {
+              resize_keyboard: true,
+              keyboard: [
+                [
+                  { text: 'Disable in-chat notifications', web_app: { url: 'https://akabuda050.github.io/solana-wallet-tg/?action=disable_notifications' } },
+                ],
+              ]
+            }
+          })
+        } else if (webAppData?.action === 'disable' && webAppData?.pubKey === ctx.db.ClientSubscriptionId?.pubKey) {
+          solanaConnection.removeOnLogsListener(ctx.db.ClientSubscriptionId.csid)
+          ctx.db.ClientSubscriptionId = null;
+
+          ctx.reply(`Notifications have been disabled for: ${webAppData?.pubKey || ''}`, {
+            reply_markup: {
+              resize_keyboard: true,
+              keyboard: [
+                [
+                  { text: 'Enable in-chat notifications', web_app: { url: 'https://akabuda050.github.io/solana-wallet-tg/?action=enable_notifications' } },
+                ],
+              ]
+            }
+          })
+        }
+      }
     } catch (e) {
       console.error(`WEB APP DATA: ${e}`);
     }
